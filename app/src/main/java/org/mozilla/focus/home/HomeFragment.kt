@@ -6,17 +6,24 @@ package org.mozilla.focus.home
 
 import android.animation.AnimatorSet
 import android.animation.ObjectAnimator
+import android.graphics.RectF
+import android.graphics.Shader
+import android.graphics.Bitmap
 import android.graphics.Color
+import android.graphics.BitmapShader
+import android.graphics.Canvas
+import android.graphics.Paint
 import android.os.Bundle
 import android.support.v4.app.Fragment
 import android.support.v7.widget.GridLayoutManager
 import android.support.v7.widget.RecyclerView
 import android.view.ContextMenu
-import android.view.KeyEvent
 import android.view.LayoutInflater
-import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
+import android.view.KeyEvent
+import android.view.Gravity
+import android.view.MenuItem
 import android.view.animation.DecelerateInterpolator
 import android.widget.LinearLayout
 import kotlinx.android.synthetic.main.fragment_home.*
@@ -259,8 +266,26 @@ private fun onBindCustomHomeTile(uiLifecycleCancelJob: Job, holder: TileViewHold
         }
 
         // Wait for both to complete so we can animate them together.
-        iconView.setImageBitmap(screenshot.await()) // TODO: if null, provide placeholder.
+        val screenshotToRound = screenshot.await() // TODO: if null, provide placeholder.
+        val cornerRadius = 8.toFloat()
+        // Need copy of screenshot bitmap because it is immutable
+        val copyOfScreenshot = Bitmap.createBitmap(screenshotToRound.width, screenshotToRound.height, screenshotToRound.config)
+        val canvas = Canvas(copyOfScreenshot)
+        val paint = Paint()
+        // Need to set isAntiAlias to true because it smooths out the edges of what is being drawn
+        paint.isAntiAlias = true
+        // Need the shader to replicate the edge color if the shader draws outside of its original bounds
+        paint.shader = BitmapShader(screenshotToRound, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP)
+        canvas.drawRoundRect(RectF(0.0f, 0.0f, screenshotToRound.width.toFloat(), screenshotToRound.height.toFloat()), cornerRadius, cornerRadius, paint)
+
+        iconView.setImageBitmap(copyOfScreenshot)
         titleView.text = title.await()
+
+        val layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 130)
+        layoutParams.gravity = Gravity.CENTER
+        val marginValue = 10
+        layoutParams.setMargins(marginValue, marginValue, marginValue, 0)
+        iconView.layoutParams = layoutParams
 
         // Animate to avoid pop-in due to thread hand-offs. TODO: animation is janky.
         AnimatorSet().apply {
